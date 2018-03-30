@@ -16,18 +16,13 @@ from threading import local
 
 from django.conf import settings
 from django.core.cache.backends.base import InvalidCacheBackendError
-from django.core.cache.backends.memcached import BaseMemcachedCache
+from django.core.cache.backends.memcached import BaseMemcachedCache, DEFAULT_TIMEOUT
 
 try:
     import pylibmc
     from pylibmc import Error as MemcachedError
 except ImportError:
     raise InvalidCacheBackendError('Could not import pylibmc.')
-
-try:
-    from django.core.cache.backends.memcached import DEFAULT_TIMEOUT
-except ImportError:
-    DEFAULT_TIMEOUT = None
 
 
 log = logging.getLogger('django.pylibmc')
@@ -45,20 +40,12 @@ if not COMPRESS_LEVEL == -1:
     if not pylibmc.support_compression:
         warnings.warn('A compression level was provided but pylibmc was '
                       'not compiled with support for it.')
-    if not pylibmc.__version__ >= '1.3.0':
-        warnings.warn('A compression level was provided but pylibmc 1.3.0 '
-                      'or above is required to handle this option.')
-
 
 # Keyword arguments to configure compression options
-# based on capabilities of a provided pylibmc library.
 COMPRESS_KWARGS = {
-    # Requires pylibmc 1.0 and above. Given that the minumum supported
-    # version (as of now) is 1.1, the parameter is always included.
     'min_compress_len': MIN_COMPRESS_LEN,
+    'compress_level': COMPRESS_LEVEL,
 }
-if pylibmc.__version__ >= '1.3.0':
-    COMPRESS_KWARGS['compress_level'] = COMPRESS_LEVEL
 
 
 class PyLibMCCache(BaseMemcachedCache):
@@ -103,13 +90,7 @@ class PyLibMCCache(BaseMemcachedCache):
         if timeout == 0:
             return timeout
 
-        try:
-            return super(PyLibMCCache, self).get_backend_timeout(timeout)
-        except AttributeError:
-            # ._get_memcache_timeout() will be deprecated in Django 1.9
-            # It's already raising DeprecationWarning in Django 1.8
-            # See: https://docs.djangoproject.com/en/1.8/internals/deprecation/#deprecation-removed-in-1-9
-            return self._get_memcache_timeout(timeout)
+        return super(PyLibMCCache, self).get_backend_timeout(timeout)
 
     def add(self, key, value, timeout=DEFAULT_TIMEOUT, version=None):
         key = self.make_key(key, version=version)
@@ -118,18 +99,18 @@ class PyLibMCCache(BaseMemcachedCache):
                                    self.get_backend_timeout(timeout),
                                    **COMPRESS_KWARGS)
         except pylibmc.ServerError:
-            log.error('ServerError saving %s (%d bytes)' % (key, len(str(value))),
+            log.error('ServerError saving %s (%d bytes)', key, len(str(value)),
                       exc_info=True)
             return False
         except MemcachedError as e:
-            log.error('MemcachedError: %s' % e, exc_info=True)
+            log.error('MemcachedError: %s', e, exc_info=True)
             return False
 
     def get(self, key, default=None, version=None):
         try:
             return super(PyLibMCCache, self).get(key, default, version)
         except MemcachedError as e:
-            log.error('MemcachedError: %s' % e, exc_info=True)
+            log.error('MemcachedError: %s', e, exc_info=True)
             return default
 
     def set(self, key, value, timeout=DEFAULT_TIMEOUT, version=None):
@@ -139,37 +120,37 @@ class PyLibMCCache(BaseMemcachedCache):
                                    self.get_backend_timeout(timeout),
                                    **COMPRESS_KWARGS)
         except pylibmc.ServerError:
-            log.error('ServerError saving %s (%d bytes)' % (key, len(str(value))),
+            log.error('ServerError saving %s (%d bytes)', key, len(str(value)),
                       exc_info=True)
             return False
         except MemcachedError as e:
-            log.error('MemcachedError: %s' % e, exc_info=True)
+            log.error('MemcachedError: %s', e, exc_info=True)
             return False
 
     def delete(self, *args, **kwargs):
         try:
             return super(PyLibMCCache, self).delete(*args, **kwargs)
         except MemcachedError as e:
-            log.error('MemcachedError: %s' % e, exc_info=True)
+            log.error('MemcachedError: %s', e, exc_info=True)
             return False
 
     def get_many(self, *args, **kwargs):
         try:
             return super(PyLibMCCache, self).get_many(*args, **kwargs)
         except MemcachedError as e:
-            log.error('MemcachedError: %s' % e, exc_info=True)
+            log.error('MemcachedError: %s', e, exc_info=True)
             return {}
 
     def set_many(self, *args, **kwargs):
         try:
             return super(PyLibMCCache, self).set_many(*args, **kwargs)
         except MemcachedError as e:
-            log.error('MemcachedError: %s' % e, exc_info=True)
+            log.error('MemcachedError: %s', e, exc_info=True)
             return False
 
     def delete_many(self, *args, **kwargs):
         try:
             return super(PyLibMCCache, self).delete_many(*args, **kwargs)
         except MemcachedError as e:
-            log.error('MemcachedError: %s' % e, exc_info=True)
+            log.error('MemcachedError: %s', e, exc_info=True)
             return False
